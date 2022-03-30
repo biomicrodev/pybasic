@@ -1,0 +1,4 @@
+dask~=2022.3
+numpy~=1.22
+scipy~=1.8
+scikit-image~=0.19
