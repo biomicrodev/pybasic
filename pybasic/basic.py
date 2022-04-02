@@ -15,8 +15,8 @@ def scalar_shrink(arr: npt.NDArray, epsilon: float) -> npt.NDArray:
 
 
 def inexact_alm_rspca_l1(
-    *,
     ims: npt.NDArray,
+    *,
     flatfield_reg: float,
     darkfield_reg: float,
     optim_tol: float,
@@ -67,10 +67,7 @@ def inexact_alm_rspca_l1(
     # A_inmask[h // 6 : h // 6 * 5, w // 6 : w // 6 * 5] = 1
 
     it = 0
-    is_converged = False
-    while not is_converged:
-        it += 1
-
+    while True:
         # update flatfield
         im_base = base * flat + dark_res
         _diff = (ims - im_base - im_res + lm1 / pen) / ent1
@@ -113,6 +110,7 @@ def inexact_alm_rspca_l1(
             else:
                 dark_mean = (_temp1 * _temp3 - _temp2 * _temp4) / _temp5
 
+            # clip to reasonable values
             dark_mean = max(dark_mean, 0)
             dark_mean = min(dark_mean, ims_min / flat_mean)
 
@@ -129,6 +127,8 @@ def inexact_alm_rspca_l1(
             dark_res += dark_diff
 
         # update lagrangian multiplier
+        # if I'm understanding Table 1 in the supplementary section correctly, the next
+        # line is missing from the MATLAB implementation
         im_base = base * flat + dark_res
         im_diff = ims - im_base - im_res
         lm1 += pen * im_diff
@@ -137,7 +137,12 @@ def inexact_alm_rspca_l1(
         pen = min(pen * pen_mult, pen_max)
 
         # check for stop condition
+        it += 1
+
         is_converged = (fro_norm(im_diff) / ims_norm) < optim_tol
+        if is_converged:
+            print(f"Converged in {it} iterations")
+            break
 
         if not is_converged and it >= max_iters:
             warnings.warn("Maximum iterations reached")
@@ -150,20 +155,18 @@ def inexact_alm_rspca_l1(
 
 def basic(
     images: npt.NDArray,
+    *,
     flatfield_reg: Optional[float] = None,
     darkfield_reg: Optional[float] = None,
     optim_tol: float = 1e-6,
     max_iters: int = 500,
     compute_darkfield: bool = False,
-    epsilon: float = 0.1,
+    eps: float = 0.1,
     reweight_tol: float = 1e-3,
     max_reweight_iters: int = 10,
 ) -> Tuple[npt.NDArray, npt.NDArray]:
-    """
-    """
-
     if images.ndim != 3:
-        raise ValueError("Images must be in IYX format")
+        raise ValueError("Images must be 3D (IYX)")
 
     ims = images
     orig_dims = ims.shape[1:3]
@@ -191,15 +194,12 @@ def basic(
     dark_last = rng.standard_normal(im_dims)
 
     it = 0
-    is_converged = False
-    while not is_converged:
-        it += 1
-
+    while True:
         # I don't want another indentation level, consider refactoring for this use case
-        _timer = timed_ctx(f"Re-weighting iter {it}", print).__enter__()
+        _timer = timed_ctx(f"Re-weighting iter {it+1}", print).__enter__()
 
         im_base, im_res, dark = inexact_alm_rspca_l1(
-            ims=ims,
+            ims,
             flatfield_reg=flatfield_reg,
             darkfield_reg=darkfield_reg,
             optim_tol=optim_tol,
@@ -209,8 +209,11 @@ def basic(
         )
 
         # update weight
-        # XE_norm = im_res / im_base  # .mean(axis=(1, 2), keepdims=True)
-        weight = 1 / (np.abs(im_res / im_base) + epsilon)
+        # in the MATLAB implementation, im_base is averaged over the pixel dimension
+        # when updating the weight, but this isn't explicitly mentioned in the
+        # supplementary section. we'll keep the MATLAB version for now.
+        _ratio = im_res / im_base.mean(axis=(1, 2), keepdims=True)
+        weight = 1 / (np.abs(_ratio) + eps)
         weight *= weight.size / weight.sum()
 
         flat_raw = im_base.mean(axis=0) - dark
@@ -233,6 +236,7 @@ def basic(
             print(f"Converged in {it} iterations")
             break
 
+        it += 1
         if it >= max_reweight_iters:
             warnings.warn("Reached max iterations; stopping")
             break
@@ -242,8 +246,12 @@ def basic(
         dark_last = dark_curr
 
     flat = im_base.mean(axis=0) - dark
+    flat /= flat.mean()
 
     if not compute_darkfield:
         dark = np.zeros(orig_dims)
 
     return flat, dark
+
+
+__all__ = ["basic"]
