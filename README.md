@@ -19,8 +19,10 @@ We recommend installing in a virtual environment.
 To generate the flatfield (and optionally, darkfield) correction images:
 
 ```
-chmod u+x bin/pybasic-gen
-bin/pybasic-gen ...
+pybasic-gen [-h] [--and-darkfield] [--iter-dims N [N ...]] [--rgb]
+            [--out PATH] [--flatfield-reg VALUE]
+            [--darkfield-reg VALUE] [--working-size VALUE]
+            images [images ...]
 ```
 
 To correct images using a given flatfield (and darkfield) image:
@@ -32,6 +34,12 @@ bin/pybasic-correct ...
 
 ## Examples
 
-Download the following examples from the MATLAB repository's [Dropbox link](https://www.dropbox.com/s/plznvzdjglrse3h/Demoexamples.zip?dl=0).
+| Image set     | Link                                     |
+|:--------------|:-----------------------------------------|
+| Cell culture  | [notebook](examples/cell_culture.ipynb)  |
 
-TODO: add jupyter notebooks for the examples.
+To run the jupyter notebook examples, download sample images from the MATLAB repository's [Dropbox link](https://www.dropbox.com/s/plznvzdjglrse3h/Demoexamples.zip?dl=0), and place into `examples/images`.
+
+## Tests
+
+Run `pytest`.
