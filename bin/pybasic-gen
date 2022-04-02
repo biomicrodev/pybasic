@@ -1,0 +1,277 @@
+#!/usr/bin/env python
+
+import argparse
+from pathlib import Path
+from typing import Tuple, Optional
+
+import PIL.Image
+import dask
+import dask.array as da
+import numpy as np
+import numpy.typing as npt
+from tifffile import tifffile
+
+from pybasic._bin import _validate_iter_dims, _flatten_paths
+from pybasic.basic import basic
+from pybasic.io import read_images
+from pybasic.utils import timed_ctx
+
+
+def parse_args() -> argparse.Namespace:
+    filename = Path(__file__).name
+
+    parser = argparse.ArgumentParser(
+        description=f"{filename} - Generate background and shading correction images for microscopy images"
+    )
+    parser.add_argument(
+        "images",
+        type=str,
+        nargs="+",
+        help="paths to images and/or folders containing images",
+    )
+    parser.add_argument(
+        "--and-darkfield",
+        dest="compute_darkfield",
+        action="store_true",
+        help="compute darkfield (in addition to flatfield)",
+    )
+    parser.add_argument(
+        "--iter-dims",
+        metavar="N",
+        type=int,
+        nargs="+",
+        help="if multichannel images, must specify dims to iterate over (dims other than YX)",
+    )
+    parser.add_argument(
+        "--rgb",
+        action="store_true",
+        help="shorthand for --iter-dims but in the special case of RGB images",
+    )
+    parser.add_argument(
+        "--out",
+        metavar="PATH",
+        type=str,
+        default=".",
+        help="output folder; current folder if not specified",
+    )
+    # parser.add_argument(
+    #     "--log",
+    #     dest="log",
+    #     metavar="PATH",
+    #     type=str,
+    #     help="log file for debugging; saved to output location",
+    # )
+    parser.add_argument(
+        "--flatfield-reg",
+        metavar="VALUE",
+        dest="flatfield_reg",
+        type=float,
+        help="flatfield regularization parameter",
+    )
+    parser.add_argument(
+        "--darkfield-reg",
+        metavar="VALUE",
+        dest="darkfield_reg",
+        type=float,
+        help="darkfield regularization parameter",
+    )
+    parser.add_argument(
+        "--working-size",
+        metavar="VALUE",
+        type=int,
+        default=128,
+        help="resize both image dims to this",
+    )
+    return parser.parse_args()
+
+
+def _is_image(p: Path) -> bool:
+    try:
+        fp = PIL.Image.open(p)
+    except PIL.UnidentifiedImageError:
+        is_image = False
+    else:
+        fp.close()
+        is_image = True
+
+    return is_image
+
+
+import sys
+
+
+def query_yes_no(question: str, default: Optional[str] = "no"):
+    # Many thanks to this stackoverflow answer: https://stackoverflow.com/a/3041990
+
+    """Ask a yes/no question via raw_input() and return their answer.
+
+    "question" is a string that is presented to the user.
+    "default" is the presumed answer if the user just hits <Enter>.
+            It must be "yes" (the default), "no" or None (meaning
+            an answer is required of the user).
+
+    The "answer" return value is True for "yes" or False for "no".
+    """
+    valid = {"yes": True, "y": True, "ye": True, "no": False, "n": False}
+    if default is None:
+        prompt = " [y/n] "
+    elif default == "yes":
+        prompt = " [Y/n] "
+    elif default == "no":
+        prompt = " [y/N] "
+    else:
+        raise ValueError(f"Invalid default answer: '{default}'")
+
+    while True:
+        sys.stdout.write(question + prompt)
+        choice = input().lower()
+        if default is not None and choice == "":
+            return valid[default]
+        elif choice in valid:
+            return valid[choice]
+        else:
+            sys.stdout.write("Please respond with 'yes' or 'no' " "(or 'y' or 'n').\n")
+
+
+def _check_output_files(out: Path, compute_darkfield: bool):
+    flat_exists = (out / "flatfield.tiff").exists()
+    dark_exists = compute_darkfield and (out / "darkfield.tiff").exists()
+
+    msg = None
+    if flat_exists and dark_exists:
+        msg = "Flatfield and darkfield images already exist. Overwrite?"
+    elif flat_exists and not dark_exists:
+        msg = "Flatfield image already exists. Overwrite?"
+
+    if msg is None:
+        return
+    overwrite = query_yes_no(msg, default="no")
+    if overwrite:
+        pass
+    else:
+        raise RuntimeError("File already exists; quitting")
+
+
+def run():
+    args = parse_args()
+
+    # check if destination files already exist before doing anything
+    out = Path(args.out)
+    try:
+        _check_output_files(out, args.compute_darkfield)
+    except RuntimeError:
+        return
+
+    # normalize paths
+    paths = [Path(p) for p in args.images]
+    paths = list(set(paths))  # make unique
+    paths = list(_flatten_paths(paths, depth=1))
+
+    # check if image by trying to open it with pillow; could be slow?
+    # is it performant to do this rather than have a dask worker try and fail?
+    # we can check the file extension, but those can be unreliable
+    paths = [p for p in paths if _is_image(p)]
+    if len(paths) == 0:
+        raise ValueError("No images provided/found")
+    elif len(paths) == 1:
+        raise ValueError("One image is not sufficient for illumination correction")
+
+    # get first image
+    orig_im_shape = tifffile.imread(paths[0]).shape
+
+    # reconcile first image with provided arguments
+    # for now, rgb is interpreted as just a special case of multichannel
+    iter_dims = set(args.iter_dims) if args.iter_dims is not None else set()
+    iter_dims = _validate_iter_dims(orig_im_shape, rgb=args.rgb, iter_dims=iter_dims)
+
+    # read_images
+    stack = read_images(
+        paths,
+        working_size=args.working_size,
+        iter_dims=iter_dims,
+    )
+    print(f"Image stack with shape {stack.shape}")
+
+    if len(iter_dims) == 0:
+        # nothing to iterate over, so we pass entire array to basic
+        stack = np.asarray(stack)
+        assert stack.ndim == 3
+        flatfield, darkfield = basic(
+            stack,
+            flatfield_reg=args.flatfield_reg,
+            darkfield_reg=args.darkfield_reg,
+            compute_darkfield=args.compute_darkfield,
+        )
+
+    else:
+        """
+        This is a little awkward with dimension wrangling because I would like to keep
+        the dimension order of the original images the same, and I need to support an
+        arbitrary set of iter dims (as far as I'm concerned). We could probably make
+        the code more legible just by moving dims around before basic, and move them
+        back afterwards.
+        """
+
+        def func(a: npt.NDArray) -> Tuple[npt.NDArray, npt.NDArray]:
+            if a.size == 1:
+                # dask (or gufunc) runs this function at least once with an array of
+                # size 1, just to check what the output is. because this is
+                # computationally expensive, we provide dummy arrays with the same dtype
+                return (
+                    np.zeros(shape=(), dtype=a.dtype),
+                    np.zeros(shape=(), dtype=a.dtype),
+                )
+
+            sing_dims = [i for i in range(a.ndim) if a.shape[i] == 1]
+            a = a.squeeze()
+
+            flatfield, darkfield = basic(
+                a,
+                flatfield_reg=args.flatfield_reg,
+                darkfield_reg=args.darkfield_reg,
+                compute_darkfield=args.compute_darkfield,
+            )
+
+            # recover original shape
+            flatfield = np.expand_dims(flatfield, sing_dims)
+            darkfield = np.expand_dims(darkfield, sing_dims)
+
+            return flatfield, darkfield
+
+        # append one to the iter dims
+        # TODO: is it worth using dstack vs stack to avoid shifting between image dims
+        # and stack dims?
+        stack_iter_dims = [ax + 1 for ax in sorted(list(iter_dims))]
+
+        # rechunk, because gufunc applies func one chunk at a time
+        chunksize = [None if i not in stack_iter_dims else 1 for i in range(stack.ndim)]
+        stack = stack.rechunk(chunksize)
+
+        # specify input and output dims to gufunc
+        # input_dims are relative to stack
+        input_dims = tuple(i for i in range(stack.ndim) if i not in stack_iter_dims)
+        assert len(input_dims) == 3
+        # output_dims are relative to image, and since we lose the first dimension after
+        # applying basic, we have to shift by one
+        output_dims = tuple(
+            i - 1 for i in range(1, stack.ndim) if i not in stack_iter_dims
+        )
+        assert len(output_dims) == 2
+
+        res = da.apply_gufunc(
+            func,
+            "(c,i,j) -> (i,j), (i,j)",
+            stack,
+            axes=[input_dims, output_dims, output_dims],
+            allow_rechunk=True,
+        )
+        flatfield, darkfield = dask.compute(res)[0]
+
+    with timed_ctx("Written", print):
+        tifffile.imwrite(out / "flatfield.tiff", flatfield, compression="zlib")
+        if args.compute_darkfield:
+            tifffile.imwrite(out / "darkfield.tiff", darkfield, compression="zlib")
+
+
+if __name__ == "__main__":
+    run()
