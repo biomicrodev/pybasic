@@ -2,10 +2,10 @@
 It's a bit awkward having util functions for the scripts here. But I would really like
 to test these functions, so here they are.
 """
-
+import sys
 import warnings
 from pathlib import Path
-from typing import Set, Iterator, Tuple
+from typing import Set, Iterator, Tuple, Optional
 
 
 def _flatten_paths(paths: Iterator[Path], depth: int = 0) -> Iterator[Path]:
@@ -57,3 +57,36 @@ def _validate_iter_dims(
 
     else:
         raise ValueError(f"Cannot process images of shape {shape}")
+
+
+def _query_yes_no(question: str, default: Optional[str] = "no") -> bool:
+    # Many thanks to this stackoverflow answer: https://stackoverflow.com/a/3041990
+
+    """Ask a yes/no question via raw_input() and return their answer.
+
+    "question" is a string that is presented to the user.
+    "default" is the presumed answer if the user just hits <Enter>.
+            It must be "yes" (the default), "no" or None (meaning
+            an answer is required of the user).
+
+    The "answer" return value is True for "yes" or False for "no".
+    """
+    valid = {"yes": True, "y": True, "ye": True, "no": False, "n": False}
+    if default is None:
+        prompt = " [y/n] "
+    elif default == "yes":
+        prompt = " [Y/n] "
+    elif default == "no":
+        prompt = " [y/N] "
+    else:
+        raise ValueError(f"Invalid default answer: '{default}'")
+
+    while True:
+        sys.stdout.write(question + prompt)
+        choice = input().lower()
+        if default is not None and choice == "":
+            return valid[default]
+        elif choice in valid:
+            return valid[choice]
+        else:
+            sys.stdout.write("Please respond with 'yes' or 'no' " "(or 'y' or 'n').\n")
