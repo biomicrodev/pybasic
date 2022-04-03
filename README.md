@@ -40,8 +40,11 @@ This script will take in a set of images and output a flatfield image (and optio
 To correct images using a given flatfield (and darkfield) image:
 
 ```
-chmod u+x bin/pybasic-correct
-bin/pybasic-correct ...
+pybasic-correct [-h] 
+                --flatfield PATH 
+                [--darkfield PATH] 
+                [--out PATH] 
+                images [images ...]
 ```
 
 ## Examples
