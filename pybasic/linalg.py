@@ -8,14 +8,6 @@ def _is_np_2d(a: npt.NDArray):
         raise ValueError("Array should be two-dimensional!")
 
 
-def _force_2d(a: npt.NDArray) -> npt.NDArray:
-    if a.ndim >= 3:
-        a = a.reshape((a.shape[0], -1))
-    elif a.ndim == 1:
-        a = np.expand_dims(a, -1)
-    return a
-
-
 def dct2d(a: npt.NDArray) -> npt.NDArray:
     # We have wrappers around scipy's dct functions to ensure that norm is 'ortho'
     # for true invertibility
