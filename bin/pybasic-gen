@@ -45,10 +45,7 @@ def read_images(
     # load, transform, reshape, and stack using dask
     images = [dask.delayed(tifffile.imread)(path) for path in paths]
     images = [dask.delayed(img_as_float)(im) for im in images]
-    images = [
-        dask.delayed(lambda im: resize(im, shape), name=resize.__name__)(im)
-        for im in images
-    ]
+    images = [dask.delayed(resize)(im, shape) for im in images]
     images = [da.from_delayed(i, shape=shape, dtype=float) for i in images]
     images = da.stack(images)
     return images

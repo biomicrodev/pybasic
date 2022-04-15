@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name="pybasic",
@@ -7,4 +7,5 @@ setup(
     url="https://github.com/biomicrodev/pybasic",
     author="Sebastian Ahn",
     license="MIT",
+    packages=find_packages(),
 )

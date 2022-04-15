@@ -28,6 +28,7 @@ pybasic-gen [-h]
             [--flatfield-reg VALUE]
             [--darkfield-reg VALUE]
             [--working-size VALUE]
+            [--out PATH]
             images [images ...]
 ```
 
@@ -49,9 +50,10 @@ pybasic-correct [-h]
 
 ## Examples
 
-| Image set     | Link                                     |
-|:--------------|:-----------------------------------------|
-| Cell culture  | [notebook](examples/cell_culture.ipynb)  |
+| Image set    | Link                                    |
+|:-------------|:----------------------------------------|
+| Cell culture | [notebook](examples/cell_culture.ipynb) |
+| WSI brain    | [notebook](examples/wsi_brain.ipynb)    |
 
 To run the jupyter notebook examples, download sample images from the MATLAB repository's [Dropbox link](https://www.dropbox.com/s/plznvzdjglrse3h/Demoexamples.zip?dl=0), and place into `examples/images`.
 

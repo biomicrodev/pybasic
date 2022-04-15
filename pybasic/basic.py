@@ -186,6 +186,7 @@ def basic(
             flatfield_reg = ims_l1 / 800
         if darkfield_reg is None:
             darkfield_reg = ims_l1 / 2_000
+    print(f"Flat reg: {flatfield_reg}, dark reg: {darkfield_reg}")
 
     ims = np.sort(ims, axis=0)  # along index dimension
 
