@@ -1,5 +1,5 @@
 import warnings
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -164,7 +164,7 @@ def basic(
     eps: float = 0.1,
     reweight_tol: float = 1e-3,
     max_reweight_iters: int = 10,
-) -> Tuple[npt.NDArray, npt.NDArray]:
+) -> Union[npt.NDArray, Tuple[npt.NDArray, npt.NDArray]]:
     if images.ndim != 3:
         raise ValueError("Images must be 3D (IYX)")
 
@@ -186,7 +186,7 @@ def basic(
             flatfield_reg = ims_l1 / 800
         if darkfield_reg is None:
             darkfield_reg = ims_l1 / 2_000
-    print(f"Flat reg: {flatfield_reg}, dark reg: {darkfield_reg}")
+    print(f"Flat reg: {flatfield_reg:,.3f}, dark reg: {darkfield_reg:,.3f}")
 
     ims = np.sort(ims, axis=0)  # along index dimension
 
@@ -249,10 +249,10 @@ def basic(
     flat = im_base.mean(axis=0) - dark
     flat /= flat.mean()
 
-    if not compute_darkfield:
-        dark = np.zeros(orig_dims)
-
-    return flat, dark
+    if compute_darkfield:
+        return flat, dark
+    else:
+        return flat
 
 
 __all__ = ["basic"]

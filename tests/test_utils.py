@@ -1,6 +1,6 @@
 import pytest
 
-from pybasic._bin import _validate_iter_dims
+from pybasic.utils import _validate_iter_dims
 
 
 class TestValidateIterDims2D:

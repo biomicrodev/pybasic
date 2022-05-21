@@ -21,15 +21,9 @@ We recommend installing in a virtual environment.
 To generate the flatfield (and optionally, darkfield) correction images:
 
 ```
-pybasic-gen [-h] 
-            [--and-darkfield] 
-            [--iter-dims N [N ...]] 
-            [--rgb]
-            [--flatfield-reg VALUE]
-            [--darkfield-reg VALUE]
-            [--working-size VALUE]
-            [--out PATH]
-            images [images ...]
+pybasic-gen [-h] [--and-darkfield] [--iter-dims N [N ...]] [--rgb] [--out PATH] 
+            [--flatfield-reg VALUE] [--darkfield-reg VALUE] [--working-size VALUE] 
+            [--max-images VALUE] images [images ...]
 ```
 
 To support a variety of image dimensionalities, the `--iter-dims` argument allows specifying which dimensions are not image dimensions; basic operates over all iter dims. For instance, to correct a set of 10 x 5 x 512 x 512 images (in TCYX format), `--iter-dims` is `0 1`, and the output is a flatfield/darkfield image of the same shape (10 x 5 x 512 x 512).
@@ -41,11 +35,8 @@ This script will take in a set of images and output a flatfield image (and optio
 To correct images using a given flatfield (and darkfield) image:
 
 ```
-pybasic-correct [-h] 
-                --flatfield PATH 
-                [--darkfield PATH] 
-                [--out PATH] 
-                images [images ...]
+pybasic-correct [-h] --flatfield PATH [--darkfield PATH] [--out PATH] images 
+                [images ...]
 ```
 
 ## Examples
