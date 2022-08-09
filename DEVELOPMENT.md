@@ -21,3 +21,7 @@ It's likely these were empirically determined by the authors.
 I would not expect exact agreement, especially because of some floating point errors for the stop condition; it may be stopping prematurely? I am not sure, but the results are *very* close while being several times faster. I will compute the difference for the provided example images soon.
 
 There is also a line potentially missing from the publication's implementation: in `inexact_alm_rspca_l1`, $I^{B,k}$ is not being recomputed when updating the Lagrange multiplier, even though the pseudocode in the supplementary section mentions it. It doesn't seem to be that big of a deal though; correcting it had only a slight effect.
+
+# Python stuff
+Local: `python -m pip install --editable .`
+As a package: `python -m pip install git+https://github.com/biomicrodev/pybasic.git`

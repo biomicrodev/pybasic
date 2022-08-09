@@ -3,11 +3,10 @@
 import argparse
 from pathlib import Path
 
-import tifffile
 from tifffile import tifffile
 
 from pybasic.compute import compute
-from pybasic.utils import timed_ctx, _flatten_paths, _query_yes_no
+from pybasic.utils import _query_yes_no, _flatten_paths, timed_ctx
 
 
 def parse_args() -> argparse.Namespace:
@@ -82,6 +81,12 @@ def parse_args() -> argparse.Namespace:
         default=500,
         help="maximum number of images to load",
     )
+    parser.add_argument(
+        "--verbose",
+        "-V",
+        action="store_true",
+        help="log messages",
+    )
     return parser.parse_args()
 
 
@@ -129,6 +134,7 @@ def run():
         flatfield_reg=args.flatfield_reg,
         darkfield_reg=args.darkfield_reg,
         compute_darkfield=args.compute_darkfield,
+        verbose=args.verbose,
     )
 
     out.mkdir(exist_ok=True, parents=True)

@@ -1,7 +1,0 @@
-black^=22.3
-graphviz^=0.19
-ipywidgets^=7.7
-jupyterlab^=3.3
-matplotlib^=3.5
-perfplot^=0.10
-pytest^=7.1

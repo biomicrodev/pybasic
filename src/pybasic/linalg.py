@@ -9,8 +9,7 @@ def _is_np_2d(a: npt.NDArray):
 
 
 def dct2d(a: npt.NDArray) -> npt.NDArray:
-    # We have wrappers around scipy's dct functions to ensure that norm is 'ortho'
-    # for true invertibility
+    # We wrap scipy's dct functions to ensure that norm is 'ortho' for true invertibility
     _is_np_2d(a)
     return scipy.fft.dctn(a, norm="ortho")
 

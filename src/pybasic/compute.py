@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, List, Tuple, Optional, Set
+from typing import List, Tuple, Optional, Set
 
 import PIL.Image
 import dask
@@ -10,13 +10,11 @@ from dask import array as da
 from numpy import typing as npt
 from skimage import img_as_float
 
-from pybasic.basic import basic
-from pybasic.utils import _validate_iter_dims
-
-ShapeLike = Union[List[int], Tuple[int, ...]]
+from .basic import basic
+from .utils import _validate_iter_axes
 
 
-def resize(im: npt.NDArray, shape: ShapeLike) -> npt.NDArray:
+def resize(im: npt.NDArray, shape: Tuple[int, ...]) -> npt.NDArray:
     return skimage.transform.resize(im, output_shape=shape, order=1, mode="symmetric")
 
 
@@ -63,10 +61,11 @@ def compute(
     *,
     iter_dims: Optional[List[int]] = None,
     rgb: bool = False,
-    working_size: int = 128,
+    working_size=128,
     flatfield_reg: Optional[float] = None,
     darkfield_reg: Optional[float] = None,
-    compute_darkfield: bool = False,
+    compute_darkfield=False,
+    verbose=False,
 ) -> Tuple[npt.NDArray, npt.NDArray]:
     # check if image by trying to open it with pillow; could be slow?
     # is it performant to do this rather than have a dask worker try and fail?
@@ -83,11 +82,12 @@ def compute(
     # reconcile first image with provided arguments
     # for now, rgb is interpreted as just a special case of multichannel
     iter_dims = set(iter_dims) if iter_dims is not None else set()
-    iter_dims = _validate_iter_dims(orig_im_shape, rgb=rgb, iter_dims=iter_dims)
+    iter_dims = _validate_iter_axes(orig_im_shape, rgb=rgb, iter_axes=iter_dims)
 
     # read_images
     stack = read_images(paths, working_size=working_size, iter_dims=iter_dims)
-    print(f"Image stack with shape {stack.shape}")
+    if verbose:
+        print(f"Image stack with shape {stack.shape}")
 
     if len(iter_dims) == 0:
         # nothing to iterate over, so we pass entire array to basic
@@ -98,6 +98,7 @@ def compute(
             flatfield_reg=flatfield_reg,
             darkfield_reg=darkfield_reg,
             compute_darkfield=compute_darkfield,
+            verbose=verbose,
         )
 
     else:
@@ -128,6 +129,7 @@ def compute(
                 flatfield_reg=flatfield_reg,
                 darkfield_reg=darkfield_reg,
                 compute_darkfield=compute_darkfield,
+                verbose=verbose,
             )
 
             # recover original shape

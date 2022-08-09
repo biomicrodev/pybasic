@@ -1,7 +1,0 @@
-dask^=2022.4
-imagecodecs^=2022.2
-numpy^=1.22
-pillow^=9.1
-scipy^=1.8
-scikit-image^=0.19
-tifffile^=2022.3

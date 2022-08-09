@@ -1,46 +1,63 @@
+import time
 import warnings
 from typing import Optional, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
+from numba import jit, njit
 
-from pybasic.linalg import dct2d, idct2d, fro_norm, l1_norm
-from pybasic.utils import timed_ctx
+from .linalg import fro_norm, dct2d, idct2d, l1_norm
+from .utils import timed_ctx
 
 rng = np.random.default_rng(seed=0)
 
 
+@njit
 def scalar_shrink(arr: npt.NDArray, epsilon: float) -> npt.NDArray:
     return np.sign(arr) * np.maximum(np.abs(arr) - epsilon, 0)
 
 
+# @njit
+def fast_subtract(a1, a2, a3, s1, s2, s3):
+    r = s1 / s2
+    d = np.subtract.reduce(np.stack([a1, a2, a3]), axis=0)
+    return (d + r) / s3
+
+
+def fast_subtract_cache(aa, s1, s2, s3):
+    r = s1 / s2
+    d = np.subtract.reduce(aa, axis=0)
+    return (d + r) / s3
+
+
 def inexact_alm_rspca_l1(
-    ims: npt.NDArray,
+    stack: npt.NDArray,
     *,
     flatfield_reg: float,
     darkfield_reg: float,
     optim_tol: float,
     max_iters: int,
-    weight: Optional[npt.NDArray] = None,
-    compute_darkfield: bool = False,
+    weights: Optional[npt.NDArray] = None,
+    compute_darkfield=False,
     # darkfield_upper_lim: float = 1e7,
-) -> Tuple[npt.NDArray, ...]:
-    if weight is not None:
-        if weight.shape != ims.shape:
+) -> Tuple:
+    # stack is of shape NYX
+    assert stack.ndim == 3
+    n = stack.shape[0]
+    im_dims = stack.shape[1:]
+    full_dims = stack.shape
+
+    if weights is not None:
+        if weights.shape != stack.shape:
             raise ValueError(
-                f"Mismatch between dims of weight ({weight.shape}) and images ({ims.shape})"
+                f"Mismatch between dims of weight ({weights.shape}) and images ({stack.shape})"
             )
-        weight = np.ones(ims.shape)
+        weights = np.ones(stack.shape)
 
     lm1 = 0  # lagrange multiplier
     # lm2 = 0
     ent1 = 1  # ?
     ent2 = 10
-
-    # convenience shapes
-    n = ims.shape[0]
-    im_dims = ims.shape[1:3]
-    full_dims = ims.shape
 
     # variables
     im_res = np.zeros(full_dims)
@@ -49,28 +66,30 @@ def inexact_alm_rspca_l1(
     flat = np.zeros(im_dims)
 
     # adaptive penalty
-    ims_vec = ims.reshape((n, -1))
+    ims_vec = stack.reshape((n, -1))
     norm_two = np.linalg.svd(ims_vec, compute_uv=False, full_matrices=False)[0]
     pen = 12.5 / norm_two  # initial penalty
     pen_max = pen * 1e7
     pen_mult = 1.5
     # TODO: can we set the initial penalty to something reasonable without having to
-    # compute the SVD?
+    #  compute the SVD?
 
     # convenience constants
-    ims_norm = fro_norm(ims)
-    ims_min = ims.min()
+    ims_norm = fro_norm(stack)
+    ims_min = stack.min()
 
     dark_mean = 0
     # A_upper_lim = ims.min(axis=0)
     # A_inmask = np.zeros((h, w))
     # A_inmask[h // 6 : h // 6 * 5, w // 6 : w // 6 * 5] = 1
 
+    # temp_sub = np.zeros(shape=(3,) + stack.shape, dtype=stack.dtype)
+
     it = 0
     while True:
         # update flatfield
         im_base = base * flat + dark_res
-        _diff = (ims - im_base - im_res + lm1 / pen) / ent1
+        _diff = (stack - im_base - im_res + lm1 / pen) / ent1
         _diff = _diff.mean(axis=0)
         flat_f = dct2d(flat) + dct2d(_diff)
         flat_f = scalar_shrink(flat_f, flatfield_reg / (ent1 * pen))
@@ -78,11 +97,11 @@ def inexact_alm_rspca_l1(
 
         # update residual
         im_base = base * flat + dark_res
-        im_res += (ims - im_base - im_res + lm1 / pen) / ent1
-        im_res = scalar_shrink(im_res, weight / (ent1 * pen))
+        im_res += (stack - im_base - im_res + lm1 / pen) / ent1
+        im_res = scalar_shrink(im_res, weights / (ent1 * pen))
 
         # update baseline
-        im_diff = ims - im_res
+        im_diff = stack - im_res
         base = im_diff.mean(axis=(1, 2), keepdims=True) / im_diff.mean()
         base[base < 0] = 0
 
@@ -130,7 +149,7 @@ def inexact_alm_rspca_l1(
         # if I'm understanding Table 1 in the supplementary section correctly, the next
         # line is missing from the MATLAB implementation
         im_base = base * flat + dark_res
-        im_diff = ims - im_base - im_res
+        im_diff = stack - im_base - im_res
         lm1 += pen * im_diff
 
         # update penalty
@@ -141,7 +160,6 @@ def inexact_alm_rspca_l1(
 
         is_converged = (fro_norm(im_diff) / ims_norm) < optim_tol
         if is_converged:
-            print(f"Converged in {it} iterations")
             break
 
         if not is_converged and it >= max_iters:
@@ -150,34 +168,35 @@ def inexact_alm_rspca_l1(
 
     dark_res += dark_mean * flat
 
-    return im_base, im_res, dark_res
+    # for reporting
+    iter_report = dict(iter=it, max_iters=max_iters)
+
+    return im_base, im_res, dark_res, iter_report
 
 
 def basic(
-    images: npt.NDArray,
+    stack: npt.NDArray,
     *,
     flatfield_reg: Optional[float] = None,
     darkfield_reg: Optional[float] = None,
-    optim_tol: float = 1e-6,
-    max_iters: int = 500,
-    compute_darkfield: bool = False,
-    eps: float = 0.1,
-    reweight_tol: float = 1e-3,
-    max_reweight_iters: int = 10,
+    optim_tol=1e-6,
+    max_iters=500,
+    compute_darkfield=False,
+    eps=0.1,
+    reweight_tol=1e-3,
+    max_reweight_iters=10,
+    verbose=False,
 ) -> Union[npt.NDArray, Tuple[npt.NDArray, npt.NDArray]]:
-    if images.ndim != 3:
-        raise ValueError("Images must be 3D (IYX)")
-
-    ims = images
-    orig_dims = ims.shape[1:3]
+    # validate inputs
+    assert stack.ndim == 3, "Images must be 3D (NYX)"
 
     # resize to working size
-    full_dims = ims.shape
-    im_dims = ims.shape[1:3]
+    full_dims = stack.shape
+    im_dims = stack.shape[1:]
 
     # apply automatic regularization coefficient strategy
     if flatfield_reg is None or darkfield_reg is None:
-        ims_norm = ims.mean(axis=0)
+        ims_norm = stack.mean(axis=0)
         ims_norm /= ims_norm.mean()
         ims_dct = dct2d(ims_norm)
         ims_l1 = l1_norm(ims_dct)
@@ -186,9 +205,17 @@ def basic(
             flatfield_reg = ims_l1 / 800
         if darkfield_reg is None:
             darkfield_reg = ims_l1 / 2_000
-    print(f"Flat reg: {flatfield_reg:,.3f}, dark reg: {darkfield_reg:,.3f}")
 
-    ims = np.sort(ims, axis=0)  # along index dimension
+    if verbose:
+        if compute_darkfield:
+            print(
+                f"Flatfield regularization: {flatfield_reg:,.3f}, "
+                f"darkfield regularization: {darkfield_reg:,.3f}"
+            )
+        else:
+            print(f"Flatfield regularization: {flatfield_reg:,.3f}")
+
+    stack = np.sort(stack, axis=0)  # along index dimension
 
     weight = np.ones(full_dims)
     flat_last = np.ones(im_dims)
@@ -196,16 +223,15 @@ def basic(
 
     it = 0
     while True:
-        # I don't want another indentation level, consider refactoring for this use case
-        _timer = timed_ctx(f"Re-weighting iter {it+1}", print).__enter__()
+        _timer = timed_ctx(f"Re-weighting iter {it + 1}").__enter__()
 
-        im_base, im_res, dark = inexact_alm_rspca_l1(
-            ims,
+        im_base, im_res, dark, iter_report = inexact_alm_rspca_l1(
+            stack,
             flatfield_reg=flatfield_reg,
             darkfield_reg=darkfield_reg,
             optim_tol=optim_tol,
             max_iters=max_iters,
-            weight=weight,
+            weights=weight,
             compute_darkfield=compute_darkfield,
         )
 
@@ -229,15 +255,20 @@ def basic(
         else:
             dark_mad = temp_diff / max(l1_norm(dark_last), 1e-6)
 
-        # stop timing before stop condition check
         _timer.__exit__()
 
+        it += 1
+
+        if verbose:
+            print(
+                f"Reweighting iters: {it}/{max_reweight_iters}; {_timer._elapsed.to_compact():,.1f}"
+            )
+
+        # check stop conditions
         is_converged = max(flat_mad, dark_mad) <= reweight_tol
         if is_converged:
-            print(f"Converged in {it} iterations")
             break
 
-        it += 1
         if it >= max_reweight_iters:
             warnings.warn("Reached max iterations; stopping")
             break
