@@ -1,10 +1,8 @@
-import time
 import warnings
 from typing import Optional, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
-from numba import jit, njit
 
 from .linalg import fro_norm, dct2d, idct2d, l1_norm
 from .utils import timed_ctx
@@ -12,22 +10,8 @@ from .utils import timed_ctx
 rng = np.random.default_rng(seed=0)
 
 
-@njit
 def scalar_shrink(arr: npt.NDArray, epsilon: float) -> npt.NDArray:
     return np.sign(arr) * np.maximum(np.abs(arr) - epsilon, 0)
-
-
-# @njit
-def fast_subtract(a1, a2, a3, s1, s2, s3):
-    r = s1 / s2
-    d = np.subtract.reduce(np.stack([a1, a2, a3]), axis=0)
-    return (d + r) / s3
-
-
-def fast_subtract_cache(aa, s1, s2, s3):
-    r = s1 / s2
-    d = np.subtract.reduce(aa, axis=0)
-    return (d + r) / s3
 
 
 def inexact_alm_rspca_l1(
@@ -71,8 +55,6 @@ def inexact_alm_rspca_l1(
     pen = 12.5 / norm_two  # initial penalty
     pen_max = pen * 1e7
     pen_mult = 1.5
-    # TODO: can we set the initial penalty to something reasonable without having to
-    #  compute the SVD?
 
     # convenience constants
     ims_norm = fro_norm(stack)

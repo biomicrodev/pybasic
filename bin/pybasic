@@ -113,9 +113,9 @@ def run():
     args = parse_args()
 
     # check if destination files already exist before doing anything
-    out = Path(args.out)
+    dst = Path(args.out)
     try:
-        _check_output_files(out, args.compute_darkfield)
+        _check_output_files(dst, args.compute_darkfield)
     except RuntimeError:
         return
 
@@ -137,11 +137,16 @@ def run():
         verbose=args.verbose,
     )
 
-    out.mkdir(exist_ok=True, parents=True)
-    with timed_ctx("Written", print):
-        tifffile.imwrite(out / "flatfield.tiff", flatfield, compression="zlib")
+    dst.mkdir(exist_ok=True, parents=True)
+
+    if args.verbose:
+        out = print
+    else:
+        out = None
+    with timed_ctx("Written", out):
+        tifffile.imwrite(dst / "flatfield.tiff", flatfield, compression="zlib")
         if args.compute_darkfield:
-            tifffile.imwrite(out / "darkfield.tiff", darkfield, compression="zlib")
+            tifffile.imwrite(dst / "darkfield.tiff", darkfield, compression="zlib")
 
 
 if __name__ == "__main__":
