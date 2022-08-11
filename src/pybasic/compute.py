@@ -19,7 +19,7 @@ def resize(im: npt.NDArray, shape: Tuple[int, ...]) -> npt.NDArray:
 
 
 def read_images(
-    paths: List[Path], *, working_size: int, iter_dims: Optional[Set[int]] = None
+    paths: List[Path], *, working_size: int, iter_axes: Optional[Set[int]] = None
 ) -> da.Array:
     """
     It's possible that the error messages on a raised exception might not make sense.
@@ -27,13 +27,13 @@ def read_images(
     TODO: Check what kinds of error messages are raised on invalid inputs, e.g. unequal
     array shapes.
     """
-    if iter_dims is None:
-        iter_dims = {}
+    if iter_axes is None:
+        iter_axes = {}
 
     im1 = tifffile.imread(paths[0])
 
     # we resize the image axes to the working size
-    shape = [s if i in iter_dims else working_size for i, s in enumerate(im1.shape)]
+    shape = [s if i in iter_axes else working_size for i, s in enumerate(im1.shape)]
 
     # load, transform, reshape, and stack using dask
     images = [dask.delayed(tifffile.imread)(path) for path in paths]
@@ -59,7 +59,7 @@ def _is_image(p: Path) -> bool:
 def compute(
     paths: List[Path],
     *,
-    iter_dims: Optional[List[int]] = None,
+    iter_axes: Optional[List[int]] = None,
     rgb: bool = False,
     working_size=128,
     flatfield_reg: Optional[float] = None,
@@ -81,15 +81,15 @@ def compute(
 
     # reconcile first image with provided arguments
     # for now, rgb is interpreted as just a special case of multichannel
-    iter_dims = set(iter_dims) if iter_dims is not None else set()
-    iter_dims = _validate_iter_axes(orig_im_shape, rgb=rgb, iter_axes=iter_dims)
+    iter_axes = set(iter_axes) if iter_axes is not None else set()
+    iter_axes = _validate_iter_axes(orig_im_shape, rgb=rgb, iter_axes=iter_axes)
 
     # read_images
-    stack = read_images(paths, working_size=working_size, iter_dims=iter_dims)
+    stack = read_images(paths, working_size=working_size, iter_axes=iter_axes)
     if verbose:
         print(f"Image stack with shape {stack.shape}")
 
-    if len(iter_dims) == 0:
+    if len(iter_axes) == 0:
         # nothing to iterate over, so we pass entire array to basic
         stack = np.asarray(stack)
         assert stack.ndim == 3
@@ -105,7 +105,7 @@ def compute(
         """
         This is a little awkward with dimension wrangling because I would like to keep
         the dimension order of the original images the same, and I need to support an
-        arbitrary set of iter dims (as far as I'm concerned). We could probably make
+        arbitrary set of iter axes (as far as I'm concerned). We could probably make
         the code more legible just by moving dims around before basic, and move them
         back afterwards.
         """
@@ -141,28 +141,28 @@ def compute(
         # append one to the iter dims
         # TODO: is it worth using dstack vs stack to avoid shifting between image dims
         # and stack dims?
-        stack_iter_dims = [ax + 1 for ax in sorted(list(iter_dims))]
+        stack_iter_axes = [ax + 1 for ax in sorted(list(iter_axes))]
 
         # rechunk, because gufunc applies func one chunk at a time
-        chunksize = [None if i not in stack_iter_dims else 1 for i in range(stack.ndim)]
+        chunksize = [None if i not in stack_iter_axes else 1 for i in range(stack.ndim)]
         stack = stack.rechunk(chunksize)
 
         # specify input and output dims to gufunc
-        # input_dims are relative to stack
-        input_dims = tuple(i for i in range(stack.ndim) if i not in stack_iter_dims)
-        assert len(input_dims) == 3
-        # output_dims are relative to image, and since we lose the first dimension after
+        # input_axes are relative to stack
+        input_axes = tuple(i for i in range(stack.ndim) if i not in stack_iter_axes)
+        assert len(input_axes) == 3
+        # output_axes are relative to image, and since we lose the first dimension after
         # applying basic, we have to shift by one
-        output_dims = tuple(
-            i - 1 for i in range(1, stack.ndim) if i not in stack_iter_dims
+        output_axes = tuple(
+            i - 1 for i in range(1, stack.ndim) if i not in stack_iter_axes
         )
-        assert len(output_dims) == 2
+        assert len(output_axes) == 2
 
         res = da.apply_gufunc(
             func,
             "(c,i,j) -> (i,j), (i,j)",
             stack,
-            axes=[input_dims, output_dims, output_dims],
+            axes=[input_axes, output_axes, output_axes],
             allow_rechunk=True,
         )
         flatfield, darkfield = dask.compute(*res)

@@ -28,16 +28,16 @@ def parse_args() -> argparse.Namespace:
         help="compute darkfield (in addition to flatfield)",
     )
     parser.add_argument(
-        "--iter-dims",
+        "--iter-axes",
         metavar="N",
         type=int,
         nargs="+",
-        help="if multichannel images, must specify dims to iterate over (dims other than YX)",
+        help="if multichannel images, must specify axes to iterate over (axes other than YX)",
     )
     parser.add_argument(
         "--rgb",
         action="store_true",
-        help="shorthand for --iter-dims but in the special case of RGB images",
+        help="shorthand for --iter-axes but in the special case of RGB images",
     )
     parser.add_argument(
         "--out",
@@ -72,7 +72,7 @@ def parse_args() -> argparse.Namespace:
         metavar="VALUE",
         type=int,
         default=128,
-        help="resize both image dims to this",
+        help="resize both image axes to this",
     )
     parser.add_argument(
         "--max-images",
@@ -128,7 +128,7 @@ def run():
 
     flatfield, darkfield = compute(
         paths,
-        iter_dims=args.iter_dims,
+        iter_axes=args.iter_axes,
         rgb=args.rgb,
         working_size=args.working_size,
         flatfield_reg=args.flatfield_reg,
