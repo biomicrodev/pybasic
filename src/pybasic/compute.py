@@ -71,6 +71,7 @@ def compute(
     # is it performant to do this rather than have a dask worker try and fail?
     # we can check the file extension, but those can be unreliable
     paths = [p for p in paths if _is_image(p)]
+
     if len(paths) == 0:
         raise ValueError("No images provided/found")
     elif len(paths) == 1:
@@ -87,7 +88,7 @@ def compute(
     # read_images
     stack = read_images(paths, working_size=working_size, iter_axes=iter_axes)
     if verbose:
-        print(f"Image stack with shape {stack.shape}")
+        print(f"Image stack: {stack.shape}")
 
     if len(iter_axes) == 0:
         # nothing to iterate over, so we pass entire array to basic
