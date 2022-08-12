@@ -175,8 +175,6 @@ def basic(
     verbose=False,
     sort=False,
 ) -> Tuple[npt.NDArray, npt.NDArray]:
-    stack = stack.copy()
-
     # validate inputs
     assert stack.ndim == 3, "Images must be 3D (NYX)"
 

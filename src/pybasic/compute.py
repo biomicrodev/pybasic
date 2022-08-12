@@ -66,6 +66,7 @@ def compute(
     darkfield_reg: Optional[float] = None,
     compute_darkfield=False,
     verbose=False,
+    sort=False,
 ) -> Union[npt.NDArray, Tuple[npt.NDArray, npt.NDArray]]:
     # check if image by trying to open it with pillow; could be slow?
     # is it performant to do this rather than have a dask worker try and fail?
@@ -101,7 +102,9 @@ def compute(
             darkfield_reg=darkfield_reg,
             compute_darkfield=compute_darkfield,
             verbose=verbose,
+            sort=sort,
         )
+
     else:
         """
         This is a little awkward with dimension wrangling because I would like to keep
@@ -151,6 +154,7 @@ def compute(
                 darkfield_reg=darkfield_reg,
                 compute_darkfield=compute_darkfield,
                 verbose=verbose,
+                sort=sort,
             )
 
             # recover original shape
