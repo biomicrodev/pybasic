@@ -71,8 +71,10 @@ def inexact_alm_rspca_l1(
     while True:
         # update flatfield
         im_base = base * flat + dark_res
+
         _diff = (stack - im_base - im_res + lm1 / pen) / ent1
         _diff = _diff.mean(axis=0)
+
         flat_f = dct2d(flat) + dct2d(_diff)
         flat_f = scalar_shrink(flat_f, flatfield_reg / (ent1 * pen))
         flat = idct2d(flat_f)
@@ -194,11 +196,11 @@ def basic(
     if verbose:
         if compute_darkfield:
             print(
-                f"Flatfield regularization: {flatfield_reg:,.3f}, "
-                f"darkfield regularization: {darkfield_reg:,.3f}"
+                f"Flatfield reg: {flatfield_reg:,.3f}, "
+                f"darkfield reg: {darkfield_reg:,.3f}"
             )
         else:
-            print(f"Flatfield regularization: {flatfield_reg:,.3f}")
+            print(f"Flatfield reg: {flatfield_reg:,.3f}")
 
     stack = np.sort(stack, axis=0)  # along index dimension
 
@@ -246,12 +248,16 @@ def basic(
 
         if verbose:
             print(
-                f"Reweighting iters: {it}/{max_reweight_iters}; {_timer._elapsed.to_compact():,.1f}"
+                f"Reweight iters: {it:,}/{max_reweight_iters:,}, "
+                f"optim iters: {iter_report['iter']:,}/{iter_report['max_iters']:,}; "
+                f"{_timer._elapsed.to_compact():,.1f}"
             )
 
         # check stop conditions
         is_converged = max(flat_mad, dark_mad) <= reweight_tol
         if is_converged:
+            if verbose:
+                print("Converged")
             break
 
         if it >= max_reweight_iters:
