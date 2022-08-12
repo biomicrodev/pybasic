@@ -21,6 +21,7 @@ classifiers = [
 ]
 dependencies = [
     'dask',
+    'distributed',
     'imagecodecs',
     'numpy',
     'pillow',

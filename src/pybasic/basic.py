@@ -173,7 +173,10 @@ def basic(
     reweight_tol=1e-3,
     max_reweight_iters=10,
     verbose=False,
+    sort=False,
 ) -> Tuple[npt.NDArray, npt.NDArray]:
+    stack = stack.copy()
+
     # validate inputs
     assert stack.ndim == 3, "Images must be 3D (NYX)"
 
@@ -202,7 +205,14 @@ def basic(
         else:
             print(f"Flatfield reg: {flatfield_reg:,.3f}")
 
-    stack = np.sort(stack, axis=0)  # along index dimension
+    if sort:
+        """
+        Oddly enough, although sorting is in the paper, if the images are sorted, the
+        resulting flatfield image contains high frequencies; otherwise, the flatfield
+        image is smooth as expected. We leave it out by default.
+        """
+        stack = np.sort(stack, axis=0)  # along index dimension
+        stack = stack[::-1, ...]
 
     weight = np.ones(full_dims)
     flat_last = np.ones(im_dims)
