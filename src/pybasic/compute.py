@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Tuple, Optional, Set
+from typing import List, Tuple, Optional, Set, Union
 
 import PIL.Image
 import dask
@@ -66,7 +66,7 @@ def compute(
     darkfield_reg: Optional[float] = None,
     compute_darkfield=False,
     verbose=False,
-) -> Tuple[npt.NDArray, npt.NDArray]:
+) -> Union[npt.NDArray, Tuple[npt.NDArray, npt.NDArray]]:
     # check if image by trying to open it with pillow; could be slow?
     # is it performant to do this rather than have a dask worker try and fail?
     # we can check the file extension, but those can be unreliable
@@ -93,6 +93,7 @@ def compute(
         # nothing to iterate over, so we pass entire array to basic
         stack = np.asarray(stack)
         assert stack.ndim == 3
+
         flatfield, darkfield = basic(
             stack,
             flatfield_reg=flatfield_reg,
@@ -100,7 +101,6 @@ def compute(
             compute_darkfield=compute_darkfield,
             verbose=verbose,
         )
-
     else:
         """
         This is a little awkward with dimension wrangling because I would like to keep
@@ -109,6 +109,26 @@ def compute(
         the code more legible just by moving dims around before basic, and move them
         back afterwards.
         """
+
+        # append one to the iter dims
+        # TODO: is it worth using dstack vs stack to avoid shifting between image dims
+        # and stack dims?
+        stack_iter_axes = [ax + 1 for ax in sorted(list(iter_axes))]
+
+        # rechunk, because gufunc applies func one chunk at a time
+        chunksize = [None if i not in stack_iter_axes else 1 for i in range(stack.ndim)]
+        stack = stack.rechunk(chunksize)
+
+        # specify input and output dims to gufunc
+        # input_axes are relative to stack
+        input_axes = tuple(i for i in range(stack.ndim) if i not in stack_iter_axes)
+        assert len(input_axes) == 3
+        # output_axes are relative to image, and since we lose the first dimension after
+        # applying basic, we have to shift by one
+        output_axes = tuple(
+            i - 1 for i in range(1, stack.ndim) if i not in stack_iter_axes
+        )
+        assert len(output_axes) == 2
 
         def func(a: npt.NDArray) -> Tuple[npt.NDArray, npt.NDArray]:
             if a.size == 1:
@@ -135,28 +155,7 @@ def compute(
             # recover original shape
             flatfield = np.expand_dims(flatfield, sing_dims)
             darkfield = np.expand_dims(darkfield, sing_dims)
-
             return flatfield, darkfield
-
-        # append one to the iter dims
-        # TODO: is it worth using dstack vs stack to avoid shifting between image dims
-        # and stack dims?
-        stack_iter_axes = [ax + 1 for ax in sorted(list(iter_axes))]
-
-        # rechunk, because gufunc applies func one chunk at a time
-        chunksize = [None if i not in stack_iter_axes else 1 for i in range(stack.ndim)]
-        stack = stack.rechunk(chunksize)
-
-        # specify input and output dims to gufunc
-        # input_axes are relative to stack
-        input_axes = tuple(i for i in range(stack.ndim) if i not in stack_iter_axes)
-        assert len(input_axes) == 3
-        # output_axes are relative to image, and since we lose the first dimension after
-        # applying basic, we have to shift by one
-        output_axes = tuple(
-            i - 1 for i in range(1, stack.ndim) if i not in stack_iter_axes
-        )
-        assert len(output_axes) == 2
 
         res = da.apply_gufunc(
             func,
@@ -169,7 +168,9 @@ def compute(
 
     # resize back to original shape
     flatfield = resize(flatfield, orig_im_shape)
+
     if compute_darkfield:
         darkfield = resize(darkfield, orig_im_shape)
-
-    return flatfield, darkfield
+        return flatfield, darkfield
+    else:
+        return flatfield
