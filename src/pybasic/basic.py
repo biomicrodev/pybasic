@@ -1,5 +1,5 @@
 import warnings
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
@@ -150,6 +150,9 @@ def inexact_alm_rspca_l1(
 
     dark_res += dark_mean * flat
 
+    if not compute_darkfield:
+        assert np.all(dark_res == 0)
+
     # for reporting
     iter_report = dict(iter=it, max_iters=max_iters)
 
@@ -168,7 +171,7 @@ def basic(
     reweight_tol=1e-3,
     max_reweight_iters=10,
     verbose=False,
-) -> Union[npt.NDArray, Tuple[npt.NDArray, npt.NDArray]]:
+) -> Tuple[npt.NDArray, npt.NDArray]:
     # validate inputs
     assert stack.ndim == 3, "Images must be 3D (NYX)"
 
@@ -261,11 +264,7 @@ def basic(
 
     flat = im_base.mean(axis=0) - dark
     flat /= flat.mean()
-
-    if compute_darkfield:
-        return flat, dark
-    else:
-        return flat
+    return flat, dark
 
 
 __all__ = ["basic"]
