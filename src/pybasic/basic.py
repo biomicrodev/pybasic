@@ -210,7 +210,6 @@ def basic(
         image is smooth as expected. We leave it out by default.
         """
         stack = np.sort(stack, axis=0)  # along index dimension
-        stack = stack[::-1, ...]
 
     weight = np.ones(full_dims)
     flat_last = np.ones(im_dims)
