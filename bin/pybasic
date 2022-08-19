@@ -3,10 +3,11 @@
 import argparse
 from pathlib import Path
 
+from bmd_perf.profiling import timed_ctx
 from tifffile import tifffile
 
 from pybasic.compute import compute
-from pybasic.utils import _query_yes_no, _flatten_paths, timed_ctx
+from pybasic.utils import _query_yes_no, _flatten_paths
 
 
 def parse_args() -> argparse.Namespace:
@@ -139,11 +140,7 @@ def run():
 
     dst.mkdir(exist_ok=True, parents=True)
 
-    if args.verbose:
-        out = print
-    else:
-        out = None
-    with timed_ctx("Written", out):
+    with timed_ctx("Written", verbose=args.verbose):
         tifffile.imwrite(dst / "flatfield.tiff", flatfield, compression="zlib")
         if args.compute_darkfield:
             tifffile.imwrite(dst / "darkfield.tiff", darkfield, compression="zlib")

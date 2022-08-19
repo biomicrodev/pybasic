@@ -3,9 +3,9 @@ from typing import Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
+from bmd_perf.profiling import timed_ctx
 
 from .linalg import fro_norm, dct2d, idct2d, l1_norm
-from .utils import timed_ctx
 
 rng = np.random.default_rng(seed=0)
 
