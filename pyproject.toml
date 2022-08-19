@@ -20,19 +20,19 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
 dependencies = [
-    'dask',
-    'distributed',
-    'imagecodecs',
-    'numpy',
-    'pillow',
-    'pint',
-    'scipy',
-    'scikit-image',
-    'tifffile'
+    "dask",
+    "distributed",
+    "imagecodecs",
+    "numpy",
+    "pillow",
+    "pint",
+    "scipy",
+    "scikit-image",
+    "tifffile",
+    "bmd-perf @ git+https://github.com/biomicrodev/bmd-perf.git@master",
 ]
 
 [project.optional-dependencies]
-# build = ["build", "twine"]
 dev = [
     "black",
     "graphviz",
@@ -41,7 +41,6 @@ dev = [
     "matplotlib",
     "perfplot",
     "pytest",
-    'viztracer',
 ]
 
 [project.urls]

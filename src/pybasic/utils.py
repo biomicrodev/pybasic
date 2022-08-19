@@ -2,35 +2,10 @@
 It's a bit awkward having util functions for the scripts here. But I would really like
 to test these functions, so here they are.
 """
-import cProfile
-import functools
 import sys
-import time
 import warnings
 from pathlib import Path
-from typing import Callable, Iterator, Tuple, Set, Optional
-
-from pint import UnitRegistry
-from viztracer import VizTracer
-
-ureg = UnitRegistry()
-
-
-class timed_ctx:
-    def __init__(self, msg: str, out: Optional[Callable[[str], None]] = None):
-        self._msg = msg
-        self._out = out
-
-    def __enter__(self):
-        self._t0 = time.perf_counter() * ureg.second
-        return self
-
-    def __exit__(self, *args):
-        t1 = time.perf_counter() * ureg.second
-        elapsed = t1 - self._t0
-        if self._out is not None:
-            self._out(f"{self._msg}: {elapsed.to_compact():,.2f}")
-        self._elapsed = elapsed
+from typing import Iterator, Tuple, Set, Optional
 
 
 def _flatten_paths(paths: Iterator[Path], depth=0) -> Iterator[Path]:
@@ -115,75 +90,3 @@ def _query_yes_no(question: str, default: Optional[str] = "no") -> bool:
             return valid[choice]
         else:
             sys.stdout.write("Please respond with 'yes' or 'no' (or 'y' or 'n').\n")
-
-
-def viztrace(**viztracer_kwargs) -> Callable:
-    def outer(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def inner(*args, **kwargs):
-            try:
-                filename = Path(sys.modules["__main__"].__file__).stem
-            except AttributeError:
-                filename = "unknown"
-
-            log_path = (
-                Path(".")
-                / "logs"
-                / "viztracer"
-                / filename
-                / f"{func.__name__}_{int(time.time())}.json"
-            )
-
-            log_path.parent.mkdir(exist_ok=True, parents=True)
-
-            tracer = VizTracer(output_file=str(log_path), **viztracer_kwargs)
-            tracer.start()
-            try:
-                ret_val = func(*args, **kwargs)
-            finally:
-                tracer.stop()
-                tracer.save()
-                tracer.terminate()
-
-            return ret_val
-
-        return inner
-
-    return outer
-
-
-def profile() -> Callable:
-    def outer(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def inner(*args, **kwargs):
-            try:
-                filename = Path(sys.modules["__main__"].__file__).stem
-            except AttributeError:
-                filename = "unknown"
-
-            log_path = (
-                Path(".")
-                / "logs"
-                / "cprofile"
-                / filename
-                / f"{func.__name__}_{int(time.time())}.prof"
-            )
-
-            log_path.parent.mkdir(exist_ok=True, parents=True)
-
-            pr = cProfile.Profile()
-            pr.enable()
-
-            try:
-                ret_val = func(*args, **kwargs)
-
-            finally:
-                pr.disable()
-                pr.dump_stats(log_path)
-                print(f"cProfile profile saved to {log_path.resolve()}")
-
-            return ret_val
-
-        return inner
-
-    return outer
