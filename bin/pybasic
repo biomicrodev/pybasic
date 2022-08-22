@@ -142,8 +142,7 @@ def run():
 
     with timed_ctx("Written", verbose=args.verbose):
         tifffile.imwrite(dst / "flatfield.tiff", flatfield, compression="zlib")
-        if args.compute_darkfield:
-            tifffile.imwrite(dst / "darkfield.tiff", darkfield, compression="zlib")
+        tifffile.imwrite(dst / "darkfield.tiff", darkfield, compression="zlib")
 
 
 if __name__ == "__main__":

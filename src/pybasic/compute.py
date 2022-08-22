@@ -67,7 +67,7 @@ def compute(
     compute_darkfield=False,
     verbose=False,
     sort=False,
-) -> Union[npt.NDArray, Tuple[npt.NDArray, npt.NDArray]]:
+) -> Tuple[npt.NDArray, npt.NDArray]:
     # check if image by trying to open it with pillow; could be slow?
     # is it performant to do this rather than have a dask worker try and fail?
     # we can check the file extension, but those can be unreliable
@@ -173,9 +173,5 @@ def compute(
 
     # resize back to original shape
     flatfield = resize(flatfield, orig_im_shape)
-
-    if compute_darkfield:
-        darkfield = resize(darkfield, orig_im_shape)
-        return flatfield, darkfield
-    else:
-        return flatfield
+    darkfield = resize(darkfield, orig_im_shape)
+    return flatfield, darkfield
