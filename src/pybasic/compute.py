@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Tuple, Optional, Set, Union
+from typing import List, Tuple, Optional, Set
 
 import PIL.Image
 import dask
@@ -18,6 +18,13 @@ def resize(im: npt.NDArray, shape: Tuple[int, ...]) -> npt.NDArray:
     return skimage.transform.resize(im, output_shape=shape, order=1, mode="symmetric")
 
 
+def read_image(path: Path, shape: Tuple[int]) -> npt.NDArray:
+    image = tifffile.imread(path, maxworkers=1)
+    image = img_as_float(image)
+    image = resize(image, shape)
+    return image
+
+
 def read_images(
     paths: List[Path], *, working_size: int, iter_axes: Optional[Set[int]] = None
 ) -> da.Array:
@@ -33,12 +40,12 @@ def read_images(
     im1 = tifffile.imread(paths[0])
 
     # we resize the image axes to the working size
-    shape = [s if i in iter_axes else working_size for i, s in enumerate(im1.shape)]
+    shape = tuple(
+        s if i in iter_axes else working_size for i, s in enumerate(im1.shape)
+    )
 
     # load, transform, reshape, and stack using dask
-    images = [dask.delayed(tifffile.imread)(path) for path in paths]
-    images = [dask.delayed(img_as_float)(im) for im in images]
-    images = [dask.delayed(resize)(im, shape) for im in images]
+    images = [dask.delayed(read_image)(path, shape) for path in paths]
     images = [da.from_delayed(i, shape=shape, dtype=float) for i in images]
     images = da.stack(images)
     return images

@@ -257,7 +257,7 @@ def basic(
             print(
                 f"Reweight iters: {it:,}/{max_reweight_iters:,}, "
                 f"optim iters: {iter_report['iter']:,}/{iter_report['max_iters']:,}; "
-                f"{_timer._elapsed.to_compact():,.1f}"
+                f"{_timer._elapsed.to_compact():~,.1f}"
             )
 
         # check stop conditions
