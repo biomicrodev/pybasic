@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Tuple, Optional, Set
+from typing import List, Tuple, Optional, Set, Callable
 
 import PIL.Image
 import dask
@@ -18,15 +18,26 @@ def resize(im: npt.NDArray, shape: Tuple[int, ...]) -> npt.NDArray:
     return skimage.transform.resize(im, output_shape=shape, order=1, mode="symmetric")
 
 
-def read_image(path: Path, shape: Tuple[int]) -> npt.NDArray:
+def read_image(
+    path: Path,
+    shape: Tuple[int, ...],
+    *,
+    func: Optional[Callable[[npt.NDArray], npt.NDArray]] = None,
+) -> npt.NDArray:
     image = tifffile.imread(path, maxworkers=1)
     image = img_as_float(image)
+    if func is not None:
+        image = func(image)
     image = resize(image, shape)
     return image
 
 
 def read_images(
-    paths: List[Path], *, working_size: int, iter_axes: Optional[Set[int]] = None
+    paths: List[Path],
+    *,
+    working_size: int,
+    iter_axes: Optional[Set[int]] = None,
+    func: Optional[Callable] = None,
 ) -> da.Array:
     """
     It's possible that the error messages on a raised exception might not make sense.
@@ -45,7 +56,7 @@ def read_images(
     )
 
     # load, transform, reshape, and stack using dask
-    images = [dask.delayed(read_image)(path, shape) for path in paths]
+    images = [dask.delayed(read_image)(path, shape, func=func) for path in paths]
     images = [da.from_delayed(i, shape=shape, dtype=float) for i in images]
     images = da.stack(images)
     return images
@@ -74,6 +85,7 @@ def compute(
     compute_darkfield=False,
     verbose=False,
     sort=False,
+    func: Optional[Callable] = None,
 ) -> Tuple[npt.NDArray, npt.NDArray]:
     # check if image by trying to open it with pillow; could be slow?
     # is it performant to do this rather than have a dask worker try and fail?
@@ -94,7 +106,9 @@ def compute(
     iter_axes = _validate_iter_axes(orig_im_shape, rgb=rgb, iter_axes=iter_axes)
 
     # read_images
-    stack = read_images(paths, working_size=working_size, iter_axes=iter_axes)
+    stack = read_images(
+        paths, working_size=working_size, iter_axes=iter_axes, func=func
+    )
     if verbose:
         print(f"Image stack: {stack.shape}")
 

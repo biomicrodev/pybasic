@@ -5,10 +5,10 @@ import numpy as np
 import numpy.typing as npt
 import skimage.transform
 import skimage.util
+from bmd_perf.profiling import timed_ctx
 from tifffile import tifffile
 
 from pybasic.basic import basic
-from pybasic.utils import timed_ctx
 
 working_size = 128
 images_path = Path(r"../examples/images/Cell_culture/Uncorrected/DAPI")
