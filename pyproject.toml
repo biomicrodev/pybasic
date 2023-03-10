@@ -1,11 +1,10 @@
-[project]
+[tool.poetry]
 name = "pybasic"
 version = "0.0.1"
 description = "Background and shading correction for microscopy images"
 readme = "README.md"
-requires-python = ">=3.7"
-license = { file = "LICENSE" }
-authors = [{ name = "Sebastian Ahn" }]
+license = "LICENSE"
+authors = ["Sebastian Ahn <wahn1@bwh.harvard.edu>"]
 keywords = [
     "microscopy",
     "imaging",
@@ -14,43 +13,37 @@ keywords = [
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
-dependencies = [
-    "dask",
-    "distributed",
-    "imagecodecs",
-    "numpy",
-    "pillow",
-    "pint",
-    "scipy",
-    "scikit-image",
-    "tifffile",
-    "bmd-perf @ git+https://github.com/biomicrodev/bmd-perf.git@master",
-]
-
-[project.optional-dependencies]
-dev = [
-    "black",
-    "graphviz",
-    "ipywidgets",
-    "jupyterlab",
-    "matplotlib",
-    "perfplot",
-    "pytest",
-]
-
-[project.urls]
 repository = "https://github.com/biomicrodev/pybasic"
-laboratory = "https://jonaslab.bwh.harvard.edu"
+homepage = "https://jonaslab.bwh.harvard.edu"
+packages = [{ include = "pybasic", from = "src" }]
 
-#[project.scripts]
-#pybasic = "pybasic.__main__:main"
+[tool.poetry.dependencies]
+python = ">=3.8,<3.12"
+bmd-perf = { git = "https://github.com/biomicrodev/bmd-perf.git", branch = "master" }
+dask = "^2023.3.0"
+distributed = "^2023.3.0"
+imagecodecs = "^2023.1.23"
+numpy = "^1.24.2"
+pillow = "^9.4.0"
+pint = "^0.20.1"
+scipy = "<1.9.2"
+scikit-image = "^0.20.0"
+tifffile = "^2023.2.28"
 
+[tool.poetry.group.dev.dependencies]
+black = { version = "^23.1", extras = ["d"] }
+graphviz = "^0.20.1"
+ipywidgets = "^8.0.4"
+jupyterlab = "^3.6.1"
+matplotlib = "^3.7.1"
+perfplot = "^0.10.2"
+pytest = "^7.2.2"
+
+[tool.poetry.scripts]
+pybasic = "bin.pybasic:run"
 
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

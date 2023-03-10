@@ -1,13 +1,11 @@
-#!/usr/bin/env python3
-
 import argparse
 from pathlib import Path
 
 from bmd_perf.profiling import timed_ctx
 from tifffile import tifffile
 
-from pybasic.compute import compute
-from pybasic.utils import _query_yes_no, _flatten_paths
+from src.pybasic.compute import compute
+from src.pybasic.utils import _query_yes_no, _flatten_paths
 
 
 def parse_args() -> argparse.Namespace:
