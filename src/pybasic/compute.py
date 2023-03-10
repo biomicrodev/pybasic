@@ -8,7 +8,7 @@ import skimage.transform
 import tifffile
 from dask import array as da
 from numpy import typing as npt
-from skimage import img_as_float
+from skimage.util import img_as_float
 
 from .basic import basic
 from .utils import _validate_iter_axes
