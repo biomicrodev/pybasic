@@ -8,7 +8,7 @@ import skimage.util
 from bmd_perf.profiling import timed_ctx
 from tifffile import tifffile
 
-from pybasic.basic import basic
+from pybasic import compute_illum_profiles
 
 working_size = 128
 images_path = Path(r"../examples/images/Cell_culture/Uncorrected/DAPI")
@@ -25,4 +25,4 @@ with timed_ctx("read in images", print):
     images = skimage.util.img_as_float(images)
 
 with timed_ctx("run", print):
-    flatfield, darkfield = basic(images, compute_darkfield=False)
+    flatfield, darkfield = compute_illum_profiles(images, compute_darkfield=False)

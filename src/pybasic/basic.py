@@ -1,11 +1,10 @@
 import warnings
-from typing import Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
 from bmd_perf.profiling import timed_ctx
 
-from .linalg import fro_norm, dct2d, idct2d, l1_norm
+from pybasic.linalg import fro_norm, l1_norm, dct2d, idct2d
 
 rng = np.random.default_rng(seed=0)
 
@@ -21,10 +20,10 @@ def inexact_alm_rspca_l1(
     darkfield_reg: float,
     optim_tol: float,
     max_iters: int,
-    weights: Optional[npt.NDArray] = None,
+    weights: npt.NDArray = None,
     compute_darkfield=False,
     # darkfield_upper_lim: float = 1e7,
-) -> Tuple:
+) -> tuple:
     # stack is of shape NYX
     assert stack.ndim == 3
     n = stack.shape[0]
@@ -52,9 +51,9 @@ def inexact_alm_rspca_l1(
     # adaptive penalty
     ims_vec = stack.reshape((n, -1))
     norm_two = np.linalg.svd(ims_vec, compute_uv=False, full_matrices=False)[0]
-    pen = 12.5 / norm_two  # initial penalty
-    pen_max = pen * 1e7
-    pen_mult = 1.5
+    penalty = 12.5 / norm_two  # initial penalty
+    penalty_max = penalty * 1e7
+    penalty_mult = 1.5
 
     # convenience constants
     ims_norm = fro_norm(stack)
@@ -71,18 +70,17 @@ def inexact_alm_rspca_l1(
     while True:
         # update flatfield
         im_base = base * flat + dark_res
-
-        _diff = (stack - im_base - im_res + lm1 / pen) / ent1
+        _diff = (stack - im_base - im_res + lm1 / penalty) / ent1
         _diff = _diff.mean(axis=0)
 
         flat_f = dct2d(flat) + dct2d(_diff)
-        flat_f = scalar_shrink(flat_f, flatfield_reg / (ent1 * pen))
+        flat_f = scalar_shrink(flat_f, flatfield_reg / (ent1 * penalty))
         flat = idct2d(flat_f)
 
         # update residual
         im_base = base * flat + dark_res
-        im_res += (stack - im_base - im_res + lm1 / pen) / ent1
-        im_res = scalar_shrink(im_res, weights / (ent1 * pen))
+        im_res += (stack - im_base - im_res + lm1 / penalty) / ent1
+        im_res = scalar_shrink(im_res, weights / (ent1 * penalty))
 
         # update baseline
         im_diff = stack - im_res
@@ -123,9 +121,9 @@ def inexact_alm_rspca_l1(
             dark_res = _diff - _diff.mean() - dark_diff
 
             dark_res_f = dct2d(dark_res)
-            dark_res_f = scalar_shrink(dark_res_f, darkfield_reg / (ent2 * pen))
+            dark_res_f = scalar_shrink(dark_res_f, darkfield_reg / (ent2 * penalty))
             dark_res = idct2d(dark_res_f)
-            dark_res = scalar_shrink(dark_res, darkfield_reg / (ent2 * pen))
+            dark_res = scalar_shrink(dark_res, darkfield_reg / (ent2 * penalty))
 
             dark_res += dark_diff
 
@@ -134,10 +132,10 @@ def inexact_alm_rspca_l1(
         # line is missing from the MATLAB implementation
         im_base = base * flat + dark_res
         im_diff = stack - im_base - im_res
-        lm1 += pen * im_diff
+        lm1 += penalty * im_diff
 
         # update penalty
-        pen = min(pen * pen_mult, pen_max)
+        penalty = min(penalty * penalty_mult, penalty_max)
 
         # check for stop condition
         it += 1
@@ -161,11 +159,11 @@ def inexact_alm_rspca_l1(
     return im_base, im_res, dark_res, iter_report
 
 
-def basic(
+def compute_illum_profiles(
     stack: npt.NDArray,
     *,
-    flatfield_reg: Optional[float] = None,
-    darkfield_reg: Optional[float] = None,
+    flatfield_reg: float = None,
+    darkfield_reg: float = None,
     optim_tol=1e-6,
     max_iters=500,
     compute_darkfield=False,
@@ -174,9 +172,9 @@ def basic(
     max_reweight_iters=10,
     verbose=False,
     sort=False,
-) -> Tuple[npt.NDArray, npt.NDArray]:
+) -> tuple[npt.NDArray, npt.NDArray]:
     # validate inputs
-    assert stack.ndim == 3, "Images must be 3D (NYX)"
+    assert stack.ndim == 3, "Images must be 3D (CYX)"
 
     # resize to working size
     full_dims = stack.shape
@@ -217,7 +215,11 @@ def basic(
 
     it = 0
     while True:
-        _timer = timed_ctx(f"Re-weighting iter {it + 1}").__enter__()
+        if verbose:
+            _out = print
+        else:
+            _out = lambda *a: None
+        _timer = timed_ctx(f"Re-weighting iter {it + 1}", out=_out).__enter__()
 
         im_base, im_res, dark, iter_report = inexact_alm_rspca_l1(
             stack,
@@ -280,4 +282,4 @@ def basic(
     return flat, dark
 
 
-__all__ = ["basic"]
+__all__ = ["compute_illum_profiles"]
