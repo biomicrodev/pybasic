@@ -20,7 +20,7 @@ homepage = "https://jonaslab.bwh.harvard.edu"
 packages = [{ include = "pybasic", from = "src" }]
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.12"
+python = ">=3.8,<4.0"
 bmd-perf = { git = "https://github.com/biomicrodev/bmd-perf.git", branch = "master" }
 numpy = "^1.23"
 scipy = "^1.9"
